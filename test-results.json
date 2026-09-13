@@ -1,0 +1,126 @@
+{
+  "environment": "Local Node VM with mocked Google services, plus browser verification through a local HTTP server",
+  "localSummary": "26/26 PASS",
+  "previewUi": {
+    "status": "PASS",
+    "steps": 9,
+    "rtl": true,
+    "conditionalLogic": true,
+    "experienceAddDelete": true,
+    "reviewPage": true,
+    "successCandidateId": "MJ-C-PREVIEW",
+    "progressHiddenAfterSuccess": true,
+    "cardHeaderHiddenAfterSuccess": true,
+    "desktopCentered": true,
+    "mobileCentered": true,
+    "mobileOverflow": false,
+    "successAnimationIterations": "1, 1",
+    "prefersReducedMotionRule": true
+  },
+  "tests": [
+    {
+      "name": "config 47 active / one available date",
+      "status": "PASS"
+    },
+    {
+      "name": "education select / ERP optional / marital options",
+      "status": "PASS"
+    },
+    {
+      "name": "required fields enforced individually",
+      "status": "PASS"
+    },
+    {
+      "name": "conditional fields hidden / required when visible",
+      "status": "PASS"
+    },
+    {
+      "name": "experiences 0",
+      "status": "PASS"
+    },
+    {
+      "name": "experiences 1",
+      "status": "PASS"
+    },
+    {
+      "name": "experiences 3",
+      "status": "PASS"
+    },
+    {
+      "name": "experiences 5",
+      "status": "PASS"
+    },
+    {
+      "name": "six experiences rejected",
+      "status": "PASS"
+    },
+    {
+      "name": "partial experience rejected",
+      "status": "PASS"
+    },
+    {
+      "name": "experience dates reversed rejected",
+      "status": "PASS"
+    },
+    {
+      "name": "phone preserves leading zero and +964",
+      "status": "PASS"
+    },
+    {
+      "name": "invalid email phone date number options rejected",
+      "status": "PASS"
+    },
+    {
+      "name": "HTML and unknown keys rejected; formulas stored as literal strings",
+      "status": "PASS"
+    },
+    {
+      "name": "add config question without HTML edits",
+      "status": "PASS"
+    },
+    {
+      "name": "disable config question",
+      "status": "PASS"
+    },
+    {
+      "name": "change config order",
+      "status": "PASS"
+    },
+    {
+      "name": "optional becomes required",
+      "status": "PASS"
+    },
+    {
+      "name": "config cycles and duplicate keys fail closed",
+      "status": "PASS"
+    },
+    {
+      "name": "double submit returns same ID / one candidate and experience set",
+      "status": "PASS"
+    },
+    {
+      "name": "same token always resolves to original candidate",
+      "status": "PASS"
+    },
+    {
+      "name": "atomic failure then retry / no orphan experiences",
+      "status": "PASS"
+    },
+    {
+      "name": "lost response after commit retry returns existing candidate",
+      "status": "PASS"
+    },
+    {
+      "name": "lock contention returns retryable / no writes",
+      "status": "PASS"
+    },
+    {
+      "name": "form version change rejects stale submit",
+      "status": "PASS"
+    },
+    {
+      "name": "new field creates storage column / historic columns retained",
+      "status": "PASS"
+    }
+  ]
+}
