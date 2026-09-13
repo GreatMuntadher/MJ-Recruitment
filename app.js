@@ -51,15 +51,29 @@ function send(){
  if(busy)return;
  pending=pending||requestPayload();
  setBusy(true);
- window.setTimeout(()=>{
-  const candidateId='MJ-C-GITHUB-'+String(Date.now()).slice(-6);
-  const saved=JSON.parse(localStorage.getItem('masat_candidate_preview_submissions')||'[]');
-  saved.push({candidateId,submittedAt:new Date().toISOString(),payload:pending});
-  localStorage.setItem('masat_candidate_preview_submissions',JSON.stringify(saved));
-  setBusy(false);
-  renderSuccess(candidateId);
-  values={};groups={};pending=null;
- },450);
+ const endpoint='https://script.google.com/macros/s/AKfycby8t9J5SEcS5YtsPo8OK4Z-jopooj0_hdy_3_j9r0VoFQEADAMNOUY-x9KuR3WxVeTY/exec';
+ const frameName='masat-submit-'+Date.now();
+ const iframe=document.createElement('iframe');
+ const form=document.createElement('form');
+ const payload=document.createElement('textarea');
+ let done=false;
+ const cleanup=()=>{window.removeEventListener('message',receive);form.remove();iframe.remove();};
+ const finish=r=>{
+  if(done)return;done=true;cleanup();setBusy(false);
+  if(r&&r.ok){renderSuccess(r.candidateId);values={};groups={};pending=null;return;}
+  showMessage((r&&r.message)||'تعذر الإرسال. أعد المحاولة بعد قليل.');
+  if(r&&!r.retryable)pending=null;
+ };
+ function receive(event){
+  if(!event.data||event.data.source!=='masat-candidate-form')return;
+  finish(event.data.result);
+ }
+ window.addEventListener('message',receive);
+ iframe.name=frameName;iframe.hidden=true;
+ form.method='post';form.action=endpoint;form.target=frameName;form.acceptCharset='UTF-8';form.hidden=true;
+ payload.name='payload';payload.value=JSON.stringify(pending);
+ form.append(payload);document.body.append(iframe,form);form.submit();
+ window.setTimeout(()=>finish({ok:false,retryable:true,message:'تأخر الاتصال بالخادم. أعد الإرسال من هذه الصفحة لتأكيد الطلب دون تكراره.'}),45000);
 }
 $('back').onclick=()=>{if(pending){showMessage('يرجى إعادة الإرسال أولاً لتأكيد نتيجة المحاولة السابقة.');return;}step--;render();};$('form').onsubmit=e=>{e.preventDefault();if(!config||busy)return;if(step===config.sections.length)send();else if(checkStep()){step++;render();}};
 $('next').disabled=true;
