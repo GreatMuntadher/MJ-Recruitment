@@ -1,6 +1,7 @@
 function doPost(e) {
   const result = submitStaticCandidate_(e);
-  return HtmlService.createHtmlOutput('<!doctype html><meta charset="utf-8"><script>top.postMessage({source:"masat-candidate-form",result:'+JSON.stringify(result).replace(/</g,'\u003c')+'},"*");<\/script>');
+  return HtmlService.createHtmlOutput('<!doctype html><meta charset="utf-8"><script>top.postMessage({source:"masat-candidate-form",result:'+JSON.stringify(result).replace(/</g,'\u003c')+'},"*");<\/script>')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
 function submitStaticCandidate_(e) {
