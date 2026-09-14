@@ -17,6 +17,7 @@ function valueError_(f,v) {
   if(typeof v!=='string' || v.length>5000 || /[<>\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(v)) return 'قيمة غير صالحة';
   if(f.required&&!v.trim()) return 'هذا الحقل مطلوب';
   if(['select','radio','yes_no'].includes(f.type) && !f.options.includes(v)) return 'اختر من القائمة';
+  if(f.key==='expected_salary' && !/^[1-9]\d*$/.test(v)) return 'أدخل الراتب رقمًا موجبًا فقط';
   if(f.type==='number' && (!/^-?\d+(\.\d+)?$/.test(v) || !Number.isFinite(Number(v)))) return 'أدخل رقمًا صحيحًا';
   if(f.type==='email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return 'أدخل بريدًا إلكترونيًا صحيحًا';
   if(f.type==='phone' && !/^\+?[0-9][0-9 ()-]{6,19}$/.test(v)) return 'أدخل رقم هاتف صحيحًا';
@@ -35,7 +36,7 @@ function validate_(config,payload) {
     if(f.type==='section_title'||!visible_(f,values,item,config.fields)) return;
     const v=typeof source[f.key]==='string'?source[f.key].trim():source[f.key];
     const err=valueError_(f,v);if(err)errors[path]=err;
-    else if(v!==undefined&&v!==null)target[f.key]=v;
+    else if(v!==undefined&&v!==null)target[f.key]=f.key==='expected_salary'?Number(v):v;
   };
   config.fields.filter(f=>!f.group).forEach(f=>check(f,values,clean,f.key));
   Object.keys(config.repeatableGroups).forEach(g=>{
