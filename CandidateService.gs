@@ -6,7 +6,7 @@ function table_(name) {
   if(headers.some(h=>!h)||new Set(headers).size!==headers.length)throw Error('Invalid table headers');
   return {sheet,headers};
 }
-function cell_(v) { return {userEnteredValue:typeof v==='boolean'?{boolValue:v}:{stringValue:Array.isArray(v)?JSON.stringify(v):String(v==null?'':v)}}; }
+function cell_(v) { return {userEnteredValue:typeof v==='boolean'?{boolValue:v}:typeof v==='number'?{numberValue:v}:{stringValue:Array.isArray(v)?JSON.stringify(v):String(v==null?'':v)}}; }
 function appendRequest_(table,rows) {
   return {appendCells:{sheetId:table.sheet.getSheetId(),rows:rows.map(row=>({values:table.headers.map(h=>cell_(row[h]))})),fields:'userEnteredValue'}};
 }
