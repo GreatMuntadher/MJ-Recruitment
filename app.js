@@ -40,7 +40,7 @@ function renderReview(){config.sections.forEach((s,i)=>{const box=el('div',undef
 function clientError(f,v){const empty=v===undefined||v===null||v===''||(Array.isArray(v)&&!v.length);if(f.required&&(empty||(f.type==='checkbox'&&v!==true)||(typeof v==='string'&&!v.trim())))return 'هذا الحقل مطلوب';if(empty)return '';if(typeof v==='string'&&(v.length>5000||/[<>]/.test(v)))return 'قيمة غير صالحة';if(f.type==='email'&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v))return 'أدخل بريدًا إلكترونيًا صحيحًا';if(f.type==='phone'&&!/^\+?[0-9][0-9 ()-]{6,19}$/.test(v))return 'أدخل رقم هاتف صحيحًا';if(f.key==='expected_salary'&&!/^[1-9]\d*$/.test(String(v)))return 'أدخل الراتب رقمًا موجبًا فقط';if(f.type==='number'&&!/^-?\d+(\.\d+)?$/.test(v))return 'أدخل رقمًا صحيحًا';if(f.type==='date'&&(!/^\d{4}-\d{2}-\d{2}$/.test(v)||isNaN(Date.parse(v))||new Date(v).toISOString().slice(0,10)!==v))return 'أدخل تاريخًا صحيحًا';return '';}
 function checkStep(){let ok=true;document.querySelectorAll('.field:not([hidden])').forEach(w=>{const f=config.fields.find(x=>x.key===w.dataset.key);if(f.type==='section_title')return;const bits=w.dataset.path.split('.');const source=f.group?groups[f.group][Number(bits[1])]:values;let err=clientError(f,source[f.key]);if(f.key==='experience_end_date'&&source.experience_start_date&&source[f.key]<source.experience_start_date)err='تاريخ الانتهاء يسبق المباشرة';$(w.dataset.path+'-error').textContent=err;if(err)ok=false;});if(!ok){showMessage('يرجى إكمال الحقول الموضّحة قبل المتابعة.');document.querySelector('.error:not(:empty)')?.parentElement.querySelector('input,select,textarea')?.focus();}return ok;}
 function requestPayload(){const clean={};const gs={};config.fields.filter(f=>!f.group&&f.type!=='section_title'&&visible(f)).forEach(f=>{if(values[f.key]!==undefined)clean[f.key]=values[f.key];});Object.keys(config.repeatableGroups).forEach(g=>gs[g]=(groups[g]||[]).map(item=>{const out={};config.fields.filter(f=>f.group===g&&f.type!=='section_title'&&visible(f,item)).forEach(f=>{if(item[f.key]!==undefined)out[f.key]=item[f.key];});return out;}));return {token:crypto.randomUUID(),version:config.version,values:clean,groups:gs};}
-function setBusy(v){busy=v;document.querySelectorAll('button').forEach(b=>b.disabled=v);$('next').textContent=v?'جارٍ الإرسال…':'إرسال البيانات';}
+function setBusy(v){busy=v;document.querySelectorAll('button, #form input, #form select, #form textarea').forEach(b=>b.disabled=v);$('form').setAttribute('aria-busy',String(v));$('next').textContent=v?'جاري إرسال طلبك...':'إرسال البيانات';}
 function renderSuccess(candidateId){
  const box=el('section',undefined,'success');box.tabIndex=-1;box.setAttribute('role','status');box.setAttribute('aria-live','polite');
  const mark=el('div',undefined,'success-mark');mark.setAttribute('aria-hidden','true');mark.innerHTML='<svg viewBox="0 0 64 64" focusable="false"><circle class="success-ring" cx="32" cy="32" r="27"></circle><path class="success-check" d="M19 33.5l8.2 8L45.5 23"></path></svg>';
@@ -49,23 +49,21 @@ function renderSuccess(candidateId){
  const label=el('div','رقم الطلب','success-label');const id=el('strong',candidateId,'success-id');const note=el('p','يرجى الاحتفاظ برقم الطلب للرجوع إليه عند الحاجة.','success-note');
  box.append(mark,title,message,label,id,note);document.querySelector('.card').replaceChildren(box);document.title='تم استلام طلبك | ماسة الجود';requestAnimationFrame(()=>box.focus());
 }
-function send(){
- if(busy)return;
- pending=pending||requestPayload();
- setBusy(true);
- const endpoint='https://script.google.com/macros/s/AKfycby8t9J5SEcS5YtsPo8OK4Z-jopooj0_hdy_3_j9r0VoFQEADAMNOUY-x9KuR3WxVeTY/exec';
+function responseContract(result){
+ if(result&&result.ok===true&&/^MJ-C-\d{6}$/.test(String(result.candidateId||'')))return {ok:true,candidateId:String(result.candidateId),status:String(result.status||'accepted')};
+ return {ok:false,error:String(result&&(result.error||result.message)||'تعذر الإرسال. أعد المحاولة بعد قليل.'),retryable:!!(result&&result.retryable)};
+}
+const AppsScriptProvider={
+ submit(payload){return new Promise(resolve=>{
+ const endpoint=window.BACKEND_CONFIG&&window.BACKEND_CONFIG.providers&&window.BACKEND_CONFIG.providers.apps_script&&window.BACKEND_CONFIG.providers.apps_script.endpoint;
+ if(!endpoint){resolve({ok:false,error:'إعداد الاتصال غير مكتمل.',retryable:false});return;}
  const frameName='masat-submit-'+Date.now();
  const iframe=document.createElement('iframe');
  const form=document.createElement('form');
- const payload=document.createElement('textarea');
+ const input=document.createElement('textarea');
  let done=false;
  const cleanup=()=>{window.removeEventListener('message',receive);form.remove();iframe.remove();};
- const finish=r=>{
-  if(done)return;done=true;cleanup();setBusy(false);
-  if(r&&r.ok){renderSuccess(r.candidateId);values={};groups={};pending=null;return;}
-  showMessage((r&&r.message)||'تعذر الإرسال. أعد المحاولة بعد قليل.');
-  if(r&&!r.retryable)pending=null;
- };
+ const finish=result=>{if(done)return;done=true;cleanup();resolve(responseContract(result));};
  function receive(event){
   if(!event.data||event.data.source!=='masat-candidate-form')return;
   finish(event.data.result);
@@ -73,9 +71,36 @@ function send(){
  window.addEventListener('message',receive);
  iframe.name=frameName;iframe.hidden=true;
  form.method='post';form.action=endpoint;form.target=frameName;form.acceptCharset='UTF-8';form.hidden=true;
- payload.name='payload';payload.value=JSON.stringify(pending);
- form.append(payload);document.body.append(iframe,form);form.submit();
- window.setTimeout(()=>finish({ok:false,retryable:true,message:'تأخر الاتصال بالخادم. أعد الإرسال من هذه الصفحة لتأكيد الطلب دون تكراره.'}),45000);
+ input.name='payload';input.value=JSON.stringify(payload);
+ form.append(input);document.body.append(iframe,form);form.submit();
+ window.setTimeout(()=>finish({ok:false,error:'تأخر الاتصال بالخادم. أعد الإرسال من هذه الصفحة لتأكيد الطلب دون تكراره.',retryable:true}),45000);
+ });}
+};
+const CloudflareProvider={
+ async submit(payload){
+  const endpoint=window.BACKEND_CONFIG.providers.cloudflare.endpoint;
+  const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:AbortSignal.timeout(20000)});
+  const result=await response.json();
+  if(!response.ok)return {ok:false,error:result.error||'تعذر الإرسال.',retryable:result.retryable!==false};
+  return result;
+ }
+};
+const BackendProviders={apps_script:AppsScriptProvider,cloudflare:CloudflareProvider};
+function submitCandidateRequest(payload){
+ const mode=window.BACKEND_CONFIG&&window.BACKEND_CONFIG.mode;
+ const provider=BackendProviders[mode];
+ if(!provider)return Promise.resolve({ok:false,error:'مزود الإرسال غير مفعّل.',retryable:false});
+ return provider.submit(payload).then(responseContract).catch(()=>({ok:false,error:'تعذر الإرسال. أعد المحاولة بعد قليل.',retryable:true}));
+}
+async function send(){
+ if(busy)return;
+ pending=pending||requestPayload();
+ setBusy(true);
+ const result=await submitCandidateRequest(pending);
+ setBusy(false);
+ if(result.ok){renderSuccess(result.candidateId);values={};groups={};pending=null;return;}
+ showMessage(result.error);
+ // Keep the token for every retry, including rejected requests.
 }
 $('back').onclick=()=>{if(pending){showMessage('يرجى إعادة الإرسال أولاً لتأكيد نتيجة المحاولة السابقة.');return;}step--;render();};$('form').onsubmit=e=>{e.preventDefault();if(!config||busy)return;if(step===config.sections.length)send();else if(checkStep()){step++;render();}};
 $('next').disabled=true;
