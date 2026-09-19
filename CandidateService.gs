@@ -6,7 +6,7 @@ function table_(name) {
   if(headers.some(h=>!h)||new Set(headers).size!==headers.length)throw Error('Invalid table headers');
   return {sheet,headers};
 }
-function cell_(v) { return {userEnteredValue:typeof v==='boolean'?{boolValue:v}:typeof v==='number'?{numberValue:v}:{stringValue:Array.isArray(v)?JSON.stringify(v):String(v==null?'':v)}}; }
+function cell_(v) { return {userEnteredValue:v&&v.formula?{formulaValue:v.formula}:typeof v==='boolean'?{boolValue:v}:typeof v==='number'?{numberValue:v}:{stringValue:Array.isArray(v)?JSON.stringify(v):String(v==null?'':v)}}; }
 function appendRequest_(table,rows) {
   return {appendCells:{sheetId:table.sheet.getSheetId(),rows:rows.map(row=>({values:table.headers.map(h=>cell_(row[h]))})),fields:'userEnteredValue'}};
 }
@@ -56,10 +56,11 @@ function submitCandidate(payload) {
     const valid=validate_(config,payload);
     if(!valid.ok)return {ok:false,errors:valid.errors,message:'يرجى مراجعة الحقول المطلوبة أو غير الصحيحة.'};
     const experiences=table_('Candidate_Experiences');const logs=table_('System_Log');const requests=[];
-    expandHeaders_(candidates,config.fields.filter(f=>!f.group&&f.type!=='section_title').map(f=>f.key).concat(['Submission_Token','Submission_Hash']),requests);
+    expandHeaders_(candidates,config.fields.filter(f=>!f.group&&f.type!=='section_title').map(f=>f.key).concat(['Submission_Token','Submission_Hash','Print_Token','Print_Link']),requests);
     expandHeaders_(experiences,config.fields.filter(f=>f.group&&f.type!=='section_title').map(f=>EXPERIENCE_COLUMNS[f.key]||f.key),requests);
     id=nextId_(candidates);const now=new Date();const tz='Asia/Baghdad';
-    const row=Object.assign({},valid.values,{Candidate_ID:id,Submission_Timestamp:Utilities.formatDate(now,tz,"yyyy-MM-dd'T'HH:mm:ssXXX"),Submission_Date:Utilities.formatDate(now,tz,'yyyy-MM-dd'),Submission_Time:Utilities.formatDate(now,tz,'HH:mm:ss'),Form_Version:config.version,Status:'جديد',Submission_Token:payload.token,Submission_Hash:hash});
+    const printToken=newPrintToken_();
+    const row=Object.assign({},valid.values,{Candidate_ID:id,Submission_Timestamp:Utilities.formatDate(now,tz,"yyyy-MM-dd'T'HH:mm:ssXXX"),Submission_Date:Utilities.formatDate(now,tz,'yyyy-MM-dd'),Submission_Time:Utilities.formatDate(now,tz,'HH:mm:ss'),Form_Version:config.version,Status:'جديد',Submission_Token:payload.token,Submission_Hash:hash,Print_Token:printToken,Print_Link:printLinkCell_(printToken)});
     requests.push(appendRequest_(candidates,[row]));
     const exp=(valid.groups.experience||[]).map((item,i)=>{
       const r={Experience_ID:id+'-E'+String(i+1).padStart(2,'0'),Candidate_ID:id,Experience_Order:i+1};
