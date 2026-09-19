@@ -6,7 +6,7 @@ function table_(name) {
   if(headers.some(h=>!h)||new Set(headers).size!==headers.length)throw Error('Invalid table headers');
   return {sheet,headers};
 }
-function cell_(v) { return {userEnteredValue:v&&v.formula?{formulaValue:v.formula}:typeof v==='boolean'?{boolValue:v}:typeof v==='number'?{numberValue:v}:{stringValue:Array.isArray(v)?JSON.stringify(v):String(v==null?'':v)}}; }
+function cell_(v) { if(v&&typeof v==='object'&&v.formula)return {userEnteredValue:{formulaValue:v.formula}}; return {userEnteredValue:typeof v==='boolean'?{boolValue:v}:typeof v==='number'?{numberValue:v}:{stringValue:Array.isArray(v)?JSON.stringify(v):String(v==null?'':v)}}; }
 function appendRequest_(table,rows) {
   return {appendCells:{sheetId:table.sheet.getSheetId(),rows:rows.map(row=>({values:table.headers.map(h=>cell_(row[h]))})),fields:'userEnteredValue'}};
 }
@@ -42,7 +42,8 @@ function findSubmission_(table,token,hash) {
   // signal, but must never cause a second record or hide a successful commit.
   return {ok:true,candidateId:candidateId,duplicate:true};
 }
-function submitCandidate(payload) {
+function submitCandidate(payload) { return submitCandidate_(payload); }
+function submitCandidate_(payload, syncId) {
   let lock;let id='';
   try {
     if(!payload||typeof payload.token!=='string'||!/^[a-f0-9-]{36}$/.test(payload.token)||JSON.stringify(payload).length>100000)return {ok:false,message:'بيانات الطلب غير صالحة'};
@@ -50,7 +51,8 @@ function submitCandidate(payload) {
     if(!lock.tryLock(25000))return {ok:false,retryable:true,message:'النظام مشغول. أعد المحاولة بعد قليل.'};
     const candidates=table_('Candidates');
     const hash=hash_(canonical_({version:payload.version,values:payload.values,groups:payload.groups}));
-    const previous=findSubmission_(candidates,payload.token,hash);if(previous)return previous;
+    const previous=findSubmission_(candidates,payload.token,hash);
+    if(previous) { if(syncId && previous.candidateId!==syncId) return {ok:false,message:"candidate_id_mismatch"}; return previous; }
     const config=readConfig_();
     if(payload.version!==config.version)return {ok:false,code:'CONFIG_CHANGED',message:'تم تحديث النموذج. أعد تحميل الصفحة وراجع الحقول الجديدة.'};
     const valid=validate_(config,payload);
@@ -58,7 +60,14 @@ function submitCandidate(payload) {
     const experiences=table_('Candidate_Experiences');const logs=table_('System_Log');const requests=[];
     expandHeaders_(candidates,config.fields.filter(f=>!f.group&&f.type!=='section_title').map(f=>f.key).concat(['Submission_Token','Submission_Hash','Print_Token','Print_Link']),requests);
     expandHeaders_(experiences,config.fields.filter(f=>f.group&&f.type!=='section_title').map(f=>EXPERIENCE_COLUMNS[f.key]||f.key),requests);
-    id=nextId_(candidates);const now=new Date();const tz='Asia/Baghdad';
+    if(syncId) {
+      if(!/^MJ-C-\d{6}$/.test(syncId)) throw Error("Invalid candidateId");
+      const idColumn=candidates.headers.indexOf("Candidate_ID")+1;
+      if(candidates.sheet.getLastRow()>1 && candidates.sheet.getRange(2,idColumn,candidates.sheet.getLastRow()-1,1).createTextFinder(syncId).matchEntireCell(true).useRegularExpression(false).findNext()) return {ok:false,message:"candidate_id_conflict"};
+      id=syncId;
+      const props=PropertiesService.getScriptProperties();
+      props.setProperty("candidate_sequence",String(Math.max(Number(props.getProperty("candidate_sequence")||0),Number(syncId.slice(5)))));
+    } else id=nextId_(candidates);const now=new Date();const tz='Asia/Baghdad';
     const printToken=newPrintToken_();
     const row=Object.assign({},valid.values,{Candidate_ID:id,Submission_Timestamp:Utilities.formatDate(now,tz,"yyyy-MM-dd'T'HH:mm:ssXXX"),Submission_Date:Utilities.formatDate(now,tz,'yyyy-MM-dd'),Submission_Time:Utilities.formatDate(now,tz,'HH:mm:ss'),Form_Version:config.version,Status:'جديد',Submission_Token:payload.token,Submission_Hash:hash,Print_Token:printToken,Print_Link:printLinkCell_(printToken)});
     requests.push(appendRequest_(candidates,[row]));
